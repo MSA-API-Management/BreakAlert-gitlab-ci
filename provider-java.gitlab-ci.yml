@@ -5,22 +5,22 @@ stages:
 variables:
   DOCKER_TLS_CERTDIR: ""
 
-include:
-  - local: 'AutoGuard.gitlab-ci.yml'
-    inputs:
-      source_dir: $SEARCH_DIR
-      base_ref: "HEAD^"
-      head_ref: $CI_COMMIT_SHA
-      fail_on_breaking: "false"
-
-# Extern
 # include:
-#   - remote: 'https://raw.githubusercontent.com/MSA-API-Management/AutoGuard/v2.0/AutoGuard.gitlab-ci.yml'
+#   - local: 'AutoGuard.gitlab-ci.yml'
 #     inputs:
 #       source_dir: $SEARCH_DIR
 #       base_ref: "HEAD^"
 #       head_ref: $CI_COMMIT_SHA
 #       fail_on_breaking: "false"
+
+# Extern
+include:
+  - remote: 'https://raw.githubusercontent.com/MSA-API-Management/AutoGuard/v2/AutoGuard.gitlab-ci.yml'
+    inputs:
+      source_dir: $SEARCH_DIR
+      base_ref: "HEAD^"
+      head_ref: $CI_COMMIT_SHA
+      fail_on_breaking: "false"
 
 .default_rules:
   rules:
