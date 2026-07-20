@@ -1,0 +1,80 @@
+stages:
+  - analysis
+  - publish-changes
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+
+# include:
+#   - local: 'AutoGuard.gitlab-ci.yml'
+#     inputs:
+#       source_dir: $SEARCH_DIR
+#       base_ref: "HEAD^"
+#       head_ref: $CI_COMMIT_SHA
+#       fail_on_breaking: "false"
+
+# Extern
+include:
+  - remote: 'https://raw.githubusercontent.com/MSA-API-Management/AutoGuard/v2/AutoGuard.gitlab-ci.yml'
+    inputs:
+      source_dir: $SEARCH_DIR
+      base_ref: "HEAD^"
+      head_ref: $CI_COMMIT_SHA
+      fail_on_breaking: "false"
+
+.default_rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+autoguard-check:
+  stage: analysis
+  extends: .autoGuard
+  rules:
+    - !reference [.default_rules, rules]
+
+send-changes:
+  stage: publish-changes
+  image: curlimages/curl:latest
+  rules:
+    - !reference [.default_rules, rules]
+  variables:
+    ADDRESS: "$CI_SERVER_PROTOCOL://$CI_SERVER_HOST/$CI_PROJECT_PATH"
+  script:
+    - |
+      if [ -d "oas_diff" ]; then        
+        MD_FILE=$(ls oas_diff/*.md 2>/dev/null | head -n 1)
+        
+        if [ -n "$MD_FILE" ]; then
+          echo "Sending report: $MD_FILE"
+
+          URL_LIST=$(echo "$NOTIFIER_API" | tr ',\n\r' ' ')
+
+          for API_URL in $URL_LIST; do
+            if [ -z "$API_URL" ]; then continue; fi
+
+            echo "Notifying API: $API_URL"
+
+            CURL_CMD="curl --fail --location --request POST \"$API_URL?branch=$CI_COMMIT_BRANCH&address=$ADDRESS\""
+            CURL_CMD="$CURL_CMD -F \"markdown=<$MD_FILE\""
+
+            if [ -f "autooas-base/openapi_default.json" ]; then
+              echo "Old OpenAPI spec found in autooas-base. Attaching..."
+              CURL_CMD="$CURL_CMD -F \"oldSpec=<autooas-base/openapi_default.json\""
+            fi
+
+            if [ -f "autooas-head/openapi_default.json" ]; then
+              echo "New OpenAPI spec found in autooas-head. Attaching..."
+              CURL_CMD="$CURL_CMD -F \"newSpec=<autooas-head/openapi_default.json\""
+            fi
+
+            # Executes curl cmd
+            eval $CURL_CMD || echo "Failed to send payload to $API_URL"
+            echo ""
+          done
+
+        else
+          echo "No Markdown changes found to report in oas_diff."
+        fi
+      else
+        echo "No diff folder found."
+      fi
